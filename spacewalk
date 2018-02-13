@@ -1,0 +1,86 @@
+
+#!/bin/bash
+#     name: Spacewalk client installation Automation
+#   author: bijith.nair@hitachiconsulting.com
+#     date: 2017-10-23
+#      ver: 1.0.0
+#  purpose: To Automate spacewalk client installation
+# Copyrights : Hitachi Consulting Cooperation
+
+#The script is getting executed as root
+
+echo -e "\n ~~~~ User level Access ~~~~ "
+
+if [ $(id -u) == "0" ]; then echo -e "\nLogged in as root" && echo -e "Access check: $(echo -e "\033[32mPassed*\033[0m")"; else echo -e "\nError: You are not root. You do not have required permissions to proceed"; echo "Access Check: $(echo -e "\033[31mFailed*\033[0m")"; exit; fi
+
+#If Spacewalk server entry exist
+
+echo -e "\n ~~~~ Host file check ~~~~ "
+
+if [ -n "$(grep spacewalkprod /etc/hosts)" ]; then echo -e "\nSpacewalk entry exist.. \n$(echo -e "Hosts File Entry Check: \033[32mPassed*\033[0m")"; else 
+echo -e "\nHosts File Entry Check: \033[31mFailed*\033[0m"
+echo "192.168.133.123    spacewalkprod.testlab.local  spacewalkprod" >> /etc/hosts
+echo -e "\nUpdating /etc/hosts"
+sleep 1
+echo -e "Re-Initializing check.. \nHosts File Entry Check: $(echo -e "\033[32mPassed*\033[0m")"
+fi
+
+#bind utils installation
+
+echo -e "\n ~~~~ Bind utility Package Installation ~~~~ "
+
+if rpm -qa | grep bind-utils > /dev/null; then echo -e "\nBind - Utils already installed, Skipping. \n$(echo -e "Bind package installation check: \033[32mPassed*\033[0m")"; else echo  -e "$(echo -e "\nBind package installation check: \033[31mFailed*\033[0m") \n\n*Installing bind-utils and its dependencies... " && yum -d 0 -e 0 -y install bind-utils; if [[ $? -eq 0 ]]; then echo -e "\n*Successfully Installed bind Utils.." && sleep 1 && echo -e "\nRe-Initializing package test..  \nBind-Utils check: $(echo -e "\033[32mPassed*\033[0m")"; else echo "Something went wrong,Aborting the installation.."; exit 1; fi;fi
+
+
+#DNS Entry
+
+echo -e "\n ~~~~ Resolv.conf ~~~~ "
+
+if [ -n "$(grep testlab.local /etc/resolv.conf)" ] && [ -n "$(grep 192.168.133.210 /etc/resolv.conf)" ] && [ -n "$(grep 192.168.133.211 /etc/resolv.conf)" ]; then echo -e "\nInitializing resolv.conf entry test..  \nResolv.conf entry check: $(echo -e "\033[32mPassed*\033[0m")"
+else
+echo -e "\nresolv.conf check: \033[31mFailed*\033[0m"
+cat <<EOF> /etc/resolv.conf
+search testlab.local
+nameserver 192.168.133.210
+nameserver 192.168.133.211
+EOF
+echo -e "\nUpdating resolv.conf.."
+sleep 1
+echo -e "Re-Initializing check.. \nResolv.conf entry check: $(echo -e "\033[32mPassed*\033[0m")"
+fi
+
+#DNS Resolution
+
+echo -e "\n ~~~~ Forward Lookup ~~~~ "
+
+nslookup spacewalkprod > /dev/null;  if [[ $? -ne 0 ]]; then echo -e "\nDNS Resolution: Unable to resolve Forward Lookup, Either the server is down or the entry is missing \nDNS Resolution Check (Forward Lookup): $(echo -e "\033[31mFailed*\033[0m")"; else echo -e "\nDNS Resolved..\nDNS Resolution check (Forward Lookup): $(echo -e "\033[32mPassed*\033[0m")"; fi
+
+echo -e "\n ~~~~ Reverse Lookup ~~~~ "
+
+nslookup 192.168.133.123 > /dev/null;  if [[ $? -ne 0 ]]; then echo -e "\nDNS Resolution: Unable to resolve Reverse Lookup, Either the server is down or the entry is missing \nDNS Resolution Check (Reverse Lookup): $(echo -e "\033[31mFailed*\033[0m")"; else echo -e "\nDNS Resolved..\nDNS Resolution check (Reverse lookup): $(echo -e "\033[32mPassed*\033[0m")"; fi
+
+
+
+clear
+root_access=`if [ $(id -u) == "0" ]; then echo -e "\033[32mPassed*\033[0m"; else echo -e "\033[31mFailed*\033[0m"; fi`
+host_entry=`if [ -n "$(grep spacewalkprod /etc/hosts)" ]; then echo -e "\033[32mPassed*\033[0m"; else echo -e "\033[31mFailed*\033[0m"; fi`
+bind_install=`if rpm -qa | grep bind-utils > /dev/null; then echo -e "\033[32mPassed*\033[0m"; else echo -e "\033[31mFailed*\033[0m"; fi`
+resolv_entry=`if [ -n "$(grep testlab.local /etc/resolv.conf)" ] && [ -n "$(grep 192.168.133.210 /etc/resolv.conf)" ] && [ -n "$(grep 192.168.133.211 /etc/resolv.conf)" ]; then echo -e "\033[32mPassed*\033[0m"; else echo -e "\033[31mFailed*\033[0m"; fi`
+forward_lookup=`nslookup spacewalkprod > /dev/null;  if [[ $? -eq 0 ]]; then echo -e "\033[32mPassed*\033[0m"; else echo -e "\033[31mFailed*\033[0m"; fi`
+reverse_lookup=`nslookup 192.168.133.123 > /dev/null;  if [[ $? -eq 0 ]]; then echo -e "\033[32mPassed*\033[0m"; else echo -e "\033[31mFailed*\033[0m"; fi`
+echo -e "\n\n"
+echo -e "\t\t\t ==========================================================================="
+echo -e "\t\t\t                        =: Installation Summary :=                          "
+echo -e "\t\t\t ==========================================================================="
+echo -e "\n\n\t\t\t  1. Sudo Access Checks: $root_access"
+sleep 1
+echo -e "\n\t\t\t  2. Spacewalk Hosts Entry Checks: $host_entry"
+sleep 1
+echo -e "\n\t\t\t  3. Bind package Dependency Checks: $bind_install"
+sleep 1
+echo -e "\n\t\t\t  4. DNS Entry Checks: $resolv_entry"
+sleep 1
+echo -e "\n\t\t\t  5. Spacewalk DNS Resolution Checks:"
+echo -e "\n\t\t\t  ->   Forward lookup: $forward_lookup | Reverse Lookup: $reverse_lookup"
+echo -e "\n\n"
+echo -e "\t\t\t ==========================================================================="

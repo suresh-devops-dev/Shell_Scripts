@@ -1,0 +1,263 @@
+#!/bin/bash
+#
+# Copyright 2002-2011 Graham Forest <vitaminmoo@wza.us> All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without modification, are
+# permitted provided that the following conditions are met:
+#
+#    1. Redistributions of source code must retain the above copyright notice, this list of
+#       conditions and the following disclaimer.
+#
+#    2. Redistributions in binary form must reproduce the above copyright notice, this list
+#       of conditions and the following disclaimer in the documentation and/or other materials
+#       provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ''AS IS'' AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+# FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+# ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+#
+# The views and conclusions contained in the software and documentation are those of the
+# authors and should not be interpreted as representing official policies, either expressed
+# or implied, of Graham Forest
+
+# To get the newest version of this script, please
+# visit http://obsoleet.org/code
+#####################################################################
+
+#####################################################################
+# Dependencies:
+# tar, gzip, bzip2, unace, unrar, unzip, p7zip, lzma
+# but only if you use them
+#####################################################################
+
+# function to auto-detect if we need a subdir
+need_subdir() {
+    local count=0
+    local status=0
+    local prev_folder=''
+    while read string; do
+        count=$((count+1))
+        folder=${string%%/*} # pull the first folder out
+        if [ -z $folder ]; then
+            status=1;
+        elif [[ -n $prev_folder && $folder != $prev_folder ]]; then
+            status=1;
+        fi
+        prev_folder=$folder
+    done
+    # no need to stick a single file in a folder
+    if [ $count == 1 ]; then
+        echo 0;
+    else
+        echo $status;
+    fi
+}
+
+check_success() {
+  status=$?
+  if [ "$status" == "0" ]; then
+    echo -e " done\007" # Makes a beep when successful. - Raphael
+  else
+    echo -e " failed"
+    exit $status
+  fi
+}
+
+IAM=`basename "$0"` # Our name
+
+if [ ! "$1" ]; then # Seems we've got Altzheimer, hmm?
+    echo "$IAM: You must specify at least one file"
+    exit 1
+fi
+
+for i in "$@"; do
+
+    ITIS=`basename "$i"` # Name of file (for output)
+
+    case "$i" in # Evaluating the filetype...
+
+        # No compression at all
+        *.tar)
+            echo -n "$IAM: Unpacking tarball $ITIS..."
+            if [ $(tar ft "$i" | need_subdir) == 1 ]; then
+                dirname=$(basename "$i" .tar)
+                if [ -d "$dirname" ]; then
+                    echo
+                    echo "$IAM: directory '$dirname' already exists... aborting"
+                    exit 1
+                fi
+                mkdir "$dirname"
+                tar -C "$dirname" -xf "$i"
+            else
+                tar xf "$i"
+            fi
+            check_success
+            ;;
+
+        # tar'd and gzip'd or compress'd
+        *.tar.gz|*.tgz|*.tar.Z|*.tar.z)
+            echo -n "$IAM: Decompressing and unpacking gzip'd tarball $ITIS..."
+            if [ $(tar ft "$i" | need_subdir) == 1 ]; then
+                dirname=$(basename $i | sed -r 's/(.tar.gz|.tgz|.tar.Z|.tar.z)$//g')
+                if [ -d "$dirname" ]; then
+                    echo
+                    echo "$IAM: directory '$dirname' already exists... aborting"
+                    exit 1
+                fi
+                mkdir "$dirname"
+                gzip -dc "$i" | tar -C "$dirname" -xf -
+            else
+                gzip -dc "$i" | tar xf -
+            fi
+            check_success
+            ;;
+
+        # tar'd and bzip2'd
+        *.tar.bz2|*.tbz2|*.pkg)
+            echo -n "$IAM: Decompressing and unpacking bzip'd tarball $ITIS..."
+            if [ $(tar ft "$i" | need_subdir) == 1 ]; then
+                dirname=$(basename $i | sed -r 's/(.tar.bz2|.tbz2|.pkg)$//g')
+                if [ -d "$dirname" ]; then
+                    echo
+                    echo "$IAM: directory '$dirname' already exists... aborting"
+                    exit 1
+                fi
+                mkdir "$dirname"
+                bzip2 -dc "$i" | tar -C "$dirname" -xf -
+            else
+                bzip2 -dc "$i" | tar xf -
+            fi
+            check_success
+            ;;
+
+        # tar'd and lzma'd, thanks Michel Lang
+        *.tar.lzma|*.tar.lz|*.tlz)
+            echo -n "$IAM: Decompressing and unpacking lzma'd tarball $ITIS..."
+            if [ $(tar --lzma -tf "$i" | need_subdir) == 1 ]; then
+                dirname=$(basename $i | sed -r 's/(.tar.lzma|.tlz)$//g')
+                if [ -d "$dirname" ]; then
+                    echo
+                    echo "$IAM: directory '$dirname' already exists... aborting"
+                    exit 1
+                fi
+                mkdir "$dirname"
+                lzma -dc "$i" | tar -C "$dirname" -xf -
+            else
+                lzma -dc "$i" | tar xf -
+            fi
+            check_success
+            ;;
+
+        # tar'd and xz'd
+        *.tar.xz|*.txz)
+            echo -n "$IAM: Decompressing and unpacking xz'd tarball $ITIS..."
+            if [ $(tar tf "$i" | need_subdir) == 1 ]; then
+                dirname=$(basename $i | sed -r 's/(.tar.xz|.txz)$//g')
+                if [ -d "$dirname" ]; then
+                    echo
+                    echo "$IAM: directory '$dirname' already exists... aborting"
+                    exit 1
+                fi
+                mkdir "$dirname"
+                xz -dc "$i" | tar -C "$dirname" -xf -
+            else
+                xz -dc "$i" | tar xf -
+            fi
+            check_success
+            ;;
+
+        # gzip'd or compress'd
+        *.gz|*.Z|*.z)
+            echo -n "$IAM: Decompressing gzip archive $ITIS..."
+            gzip -dc "$i" > `basename "$i" .gz`
+            check_success
+            ;;
+
+        # bzip2'd
+        *.bz2)
+            echo -n "Decompressing bzip2 archive $ITIS...";
+            bzip2 -dc "$i" > `basename "$i" .bz2`
+            check_success
+            ;;
+
+        # lzma'd, thanks Michel Lang
+        *.lzma)
+            echo -n "Decompressing lzma archive $ITIS...";
+            lzma -dc "$i" > `basename "$i" .lzma`
+            check_success
+            ;;
+
+        # Packed with (Win)ACE
+        *.ace)
+            echo -n "$IAM: Unpacking WinACE archive $ITIS..."
+            if [ $(unace l "$i" | grep % | awk '{for (i=6; i<=NF; i++) { printf("%s ", $i); printf("\n") } }' | need_subdir) == 1 ]; then
+                dirname=$(basename "$i" .ace)
+                unace x "$i" $dirname/
+            else
+                unace x "$i"
+            fi
+            check_success
+            ;;
+
+        # Packed with (Win)RAR
+        *.rar)
+            echo -n "$IAM: Unpacking WinRAR archive $ITIS..."
+            if [ $(unrar vb "$i" | need_subdir) == 1 ]; then
+                dirname=$(basename "$i" .rar)
+                if [ -d "$dirname" ]; then
+                    echo
+                    echo "$IAM: directory '$dirname' already exists... aborting"
+                    exit 1
+                fi
+                mkdir "$dirname"
+                unrar x "$i" "$dirname"
+            else
+                unrar x "$i"
+            fi
+            check_success
+            ;;
+
+        # Classically zipped
+        *.zip)
+            echo -n "$IAM: Unpacking pkzip archive $ITIS..."
+            if [ $(zipinfo -1 "$i" | need_subdir) == 1 ]; then
+                dirname=$(basename "$i" .zip)
+                unzip -d "$dirname" "$i"
+            else
+                unzip "$i"
+            fi
+            check_success
+            ;;
+
+        # Packed with 7zip, thanks Komoto
+        *.7z)
+            echo -n"$IAM: Unpacking 7zip archive $ITIS..."
+            if [ $(7z l -slt "$i" | grep Path | grep -v "$i" | cut -d' ' -f3 | need_subdir) == 1 ]; then
+                dirname=$(basename "$i" .7z)
+                7z x -o"$dirname" "$i"
+            else
+                7z x "$i"
+            fi
+            check_success
+            ;;
+
+        # Packed with xz
+        *.xz)
+            echo -n "$IAM: Decompressing xz archive $ITIS..."
+            xz -dc "$i" > `basename "$i" .xz`
+            check_success
+            ;;
+
+        # Ooops... people have wierd things, eh?
+        *)
+            echo "$IAM: $ITIS - Filetype unknown"
+            ;;
+
+    esac
+done
