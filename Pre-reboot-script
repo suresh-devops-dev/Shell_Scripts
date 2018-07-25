@@ -7,8 +7,8 @@
 #  purpose: report on the health of OS services and configuration
 # ==========================================================================================================
 HCVer='1.0.10'                                                                 # define HC Version
-logfile="/sysadmin/reports/$(basename ${0})-$(hostname -s)";                   # set logfile name
-[[ -e /sysadmin/reports/ ]] || mkdir -p /sysadmin/reports/                     # if missing, create output dir
+logfile="/home/bhavani.oruganti/sysadmin/reports/$(basename ${0})-$(hostname -s)";                   # set logfile name
+[[ -e /home/bhavani.oruganti/sysadmin/reports/ ]] || mkdir -p /home/bhavani.oruganti/sysadmin/reports/                     # if missing, create output dir
 [[ -e ${logfile} ]] && mv ${logfile}{,.oldreport};                             # backup output of last run
 LANG='en_US.UTF-8'                                                             # avoids formatting problems
 LC_NUMERIC='en_US.UTF-8'
@@ -48,6 +48,7 @@ echo -e "uptime: $(uptime | sed 's/^ //1')" >> ${logfile};
 echo -e "\nSystem Information\n  Manufacturer:\t$(/usr/sbin/dmidecode -s system-manufacturer)\n  Product Name:\t$(/usr/sbin/dmidecode -s system-product-name)\n        Serial:\t$(/usr/sbin/dmidecode -s system-serial-number)\n" >> ${logfile};     # report machine type
 echo -e "\nBIOS Information\n        Vendor:\t$(/usr/sbin/dmidecode -s bios-vendor)\n       Version:\t$(/usr/sbin/dmidecode -s bios-version)\n  Release Date:\t$(/usr/sbin/dmidecode -s bios-release-date)\n" >> ${logfile};                # report bios information
 echo -e "\n**** Memory ****\n$(free -m) \n\n$(free -m | xargs | awk '{print "Free/total memory: " $17 " / " $8 " MB"}')" >> ${logfile};
+
 echo -e "\n**** Time Status ****\nHWCLOCK = $(/sbin/hwclock --show)\nSYSCLOCK= $(date +'%a %d %b %Y %r %Z')" >> ${logfile};
 echo -e "\n**** NTP Status ****\n$(/etc/init.d/ntpd status)" >> ${logfile};
 echo -e "\n**** NTP Statistics *****\n$(ntpq -pn)" >> ${logfile};
@@ -105,4 +106,3 @@ echo -e "\n"
 #echo -e "Health Check Completed: ${logfile/.\/}\n";
 echo -e "\033[1mHealth Check Completed:\033 \033[0m${logfile/.\/}\033[0m";
 exit 0
-
