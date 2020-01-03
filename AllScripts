@@ -1,0 +1,2 @@
+curl -v --silent https://google.com/ --stderr - | grep expire
+
